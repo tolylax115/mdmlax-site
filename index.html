@@ -798,8 +798,7 @@ Respond ONLY with valid JSON. No markdown, no backticks, no explanation outside 
     if(document.getElementById('lfill')) document.getElementById('lfill').style.width='100%';
     setTimeout(()=>{
       try{
-        const txt=data.content.map(i=>i.text||'').join('');
-        const clean=txt.replace(/```json|```/g,'').trim();
+        const clean=(data.result||'').replace(/```json|```/g,'').trim();
         const plan=JSON.parse(clean);
         showResult(plan,kn,pn,em,zp);
       }catch(e){showErr();}
