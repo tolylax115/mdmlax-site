@@ -48,6 +48,7 @@ Return ONLY this JSON:
       headers: {
         "Content-Type": "application/json",
         "Access-Control-Allow-Origin": "*",
+        "Cache-Control": "no-store, no-cache, must-revalidate",
       },
       body: JSON.stringify({ result: clean }),
     };
