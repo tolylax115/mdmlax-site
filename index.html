@@ -790,7 +790,7 @@ Respond ONLY with valid JSON. No markdown, no backticks, no explanation outside 
   fetch('/.netlify/functions/generate-plan',{
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({prompt:prompt})
+     body:JSON.stringify({answers:answers, playerName:kn, parentName:pn, zip:zp})
   })
   .then(r=>r.json())
   .then(data=>{
