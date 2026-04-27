@@ -789,7 +789,7 @@ Respond ONLY with valid JSON. No markdown, no backticks, no explanation outside 
 
   const controller = new AbortController();
   const fetchTimeout = setTimeout(() => controller.abort(), 60000);
-  fetch('/.netlify/functions/generate-plan',{
+  fetch('/.netlify/functions/generate-plan?t='+Date.now(),{
     method:'POST',
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify({answers:answers, playerName:kn, parentName:pn, zip:zp}),
