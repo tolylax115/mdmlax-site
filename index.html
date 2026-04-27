@@ -787,13 +787,17 @@ Respond ONLY with valid JSON. No markdown, no backticks, no explanation outside 
   "next_step": "One specific actionable sentence about what to do after this week"
 }`;
 
+  const controller = new AbortController();
+  const fetchTimeout = setTimeout(() => controller.abort(), 60000);
   fetch('/.netlify/functions/generate-plan',{
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({answers:answers, playerName:kn, parentName:pn, zip:zp})
+    body:JSON.stringify({answers:answers, playerName:kn, parentName:pn, zip:zp}),
+    signal: controller.signal
   })
   .then(r=>r.json())
   .then(data=>{
+    clearTimeout(fetchTimeout);
     clearInterval(iv);
     if(document.getElementById('lfill')) document.getElementById('lfill').style.width='100%';
     setTimeout(()=>{
@@ -804,7 +808,7 @@ Respond ONLY with valid JSON. No markdown, no backticks, no explanation outside 
       }catch(e){showErr();}
     },600);
   })
-  .catch(()=>{clearInterval(iv);showErr();});
+  .catch(()=>{clearTimeout(fetchTimeout);clearInterval(iv);showErr();});
 }
 
 function showErr(){
