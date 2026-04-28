@@ -792,7 +792,920 @@ Respond ONLY with valid JSON. No markdown, no backticks, no explanation outside 
   fetch('/.netlify/functions/generate-plan?t='+Date.now(),{
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({answers:answers, playerName:kn, parentName:pn, zip:zp}),
+    body:JSON.stringify({answers:answers, playerName:kn, parentName:pn, parentEmail:em, zip:zp}),
+    signal: controller.signal
+  })
+  .then(r=>r.json())
+  .then(data=>{
+    clearTimeout(fetchTimeout);
+    clearInterval(iv);
+    if(document.getElementById('lfill')) document.getElementById('lfill').style.width='100%';
+    setTimeout(()=>{
+      try{
+        const clean=(data.result||'').replace(/```json|```/g,'').trim();
+        const plan=JSON.parse(clean);
+        showResult(plan,kn,pn,em,zp);
+      }catch(e){showErr();}
+    },600);
+  })
+  .catch(()=>{clearTimeout(fetchTimeout);clearInterval(iv);showErr();});
+}
+
+function showErr(){
+  document.getElementById('quiz-inner').innerHTML=`
+    <div class="q-card">
+      <p style="font-weight:500;">Something went wrong — please try again.</p>
+      <button class="btn-acc" style="margin-top:1rem;width:100%;justify-content:center;" onclick="renderIntro()">Start over</button>
+    </div>`;
+}
+
+function statusColor(s){
+  if(s==='needs work')return{bg:'#FCEBEB',color:'#791F1F'};
+  if(s==='solid')return{bg:'#EAF3DE',color:'#27500A'};
+  return{bg:'#FAEEDA',color:'#633806'};
+}
+
+function showResult(plan,kn,pn,em,zp){
+  const skillRows=(plan.skill_breakdown||[]).map(s=>{
+    const c=statusColor(s.status);
+    return `<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid rgba(0,0,0,.07);">
+      <span style="min-width:86px;font-size:13px;font-weight:500;">${s.skill}</span>
+      <span style="font-size:11px;padding:2px 8px;border-radius:10px;background:${c.bg};color:${c.color};flex-shrink:0;">${s.status}</span>
+      <span style="font-size:12px;color:var(--muted);line-height:1.5;">${s.note}</span>
+    </div>`;
+  }).join('');
+
+  const dayCards=(plan.week_plan||[]).map(d=>`
+    <div class="day-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;flex-wrap:wrap;gap:5px;">
+        <span style="font-weight:500;font-size:13px;">${d.day} — ${d.title}</span>
+        <div><span class="pill pill-g">${d.duration}</span><span class="pill pill-p">${d.objective}</span></div>
+      </div>
+      <p style="font-size:13px;color:var(--ink);margin:0 0 7px;line-height:1.6;">${d.drill}</p>
+      <p style="font-size:12px;color:var(--muted);margin:0;"><strong style="font-weight:500;">Coach tip:</strong> ${d.parent_tip}</p>
+    </div>`).join('');
+
+  const localCards=(plan.local_events||[]).map(e=>`
+    <div class="res-row">
+      <span class="pill pill-g" style="flex-shrink:0;margin-top:2px;">${e.type}</span>
+      <div><p style="font-size:13px;font-weight:500;margin:0 0 2px;">${e.title}</p><p style="font-size:12px;color:var(--muted);margin:0;line-height:1.5;">${e.description}</p></div>
+    </div>`).join('');
+
+  const onlineCards=(plan.online_resources||[]).map(e=>`
+    <div class="res-row">
+      <span class="pill pill-p" style="flex-shrink:0;margin-top:2px;">${e.type}</span>
+      <div><p style="font-size:13px;font-weight:500;margin:0 0 2px;">${e.title}</p><p style="font-size:12px;color:var(--muted);margin:0;line-height:1.5;">${e.description}</p></div>
+    </div>`).join('');
+
+  document.getElementById('quiz-inner').innerHTML=`
+    <div style="margin-bottom:1.25rem;">
+      <p style="font-size:12px;color:var(--muted);margin:0 0 4px;">${kn}'s player assessment</p>
+      <h2 style="font-size:19px;font-weight:500;margin:0 0 .5rem;line-height:1.3;">${plan.headline}</h2>
+      <span class="pill pill-g">Level: ${plan.skill_level_label}</span>
+    </div>
+    <div class="res-box">
+      <p style="font-size:13px;font-weight:500;margin:0 0 5px;">Where ${kn} is right now</p>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 8px;line-height:1.6;">${plan.skill_level_summary}</p>
+      <p style="font-size:13px;margin:0;"><strong>This week's focus:</strong> ${plan.top_focus}</p>
+      <p style="font-size:12px;color:var(--muted);margin:3px 0 0;">${plan.why_this_focus}</p>
+    </div>
+    <div class="res-box">
+      <p style="font-size:13px;font-weight:500;margin:0 0 4px;">Skill breakdown</p>
+      ${skillRows}
+    </div>
+    <div style="margin:1.25rem 0 .5rem;">
+      <p style="font-size:14px;font-weight:500;margin:0 0 .75rem;">7-day training plan</p>
+      ${dayCards}
+    </div>
+    <div class="res-box" style="margin-top:1.25rem;">
+      <p style="font-size:13px;font-weight:500;margin:0 0 6px;">Local events${zp?' near '+zp:''}</p>
+      ${localCards}
+    </div>
+    <div class="res-box">
+      <p style="font-size:13px;font-weight:500;margin:0 0 6px;">Online resources for you + ${kn}</p>
+      ${onlineCards}
+    </div>
+    <div class="res-box nav-note-box">
+      <p style="font-size:13px;font-weight:500;color:var(--g);margin:0 0 5px;">A note for you, ${pn}</p>
+      <p style="font-size:13px;color:var(--muted);margin:0;line-height:1.6;">${plan.parent_note}</p>
+    </div>
+    <div class="cta-box">
+      <p style="font-size:13px;font-weight:500;color:#085041;margin:0 0 5px;">What's next</p>
+      <p style="font-size:13px;color:#0F6E56;margin:0 0 1rem;line-height:1.5;">${plan.next_step}</p>
+      <button class="btn-acc" style="width:100%;justify-content:center;" onclick="closeQuiz()">Done — Train Dangerous. 🥍</button>
+    </div>
+    <p style="font-size:11px;color:var(--muted);margin-top:1rem;text-align:center;">A copy of this plan will be sent to ${em}. The full training platform is coming soon.</p>
+  `;
+  // scroll modal to top
+  document.querySelector('.modal-box').scrollTop=0;
+}
+
+// ─── SCROLL ANIMATIONS ────────────────────────────────────────────────────
+const obs=new IntersectionObserver(entries=>{
+  entries.forEach(e=>{if(e.isIntersecting) e.target.style.animationPlayState='running';});
+},{threshold:0.1});
+document.querySelectorAll('.fu').forEach(el=>{
+  el.style.animationPlayState='paused';
+  obs.observe(el);
+});
+</script>
+</body>
+</html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>MDM Lax — Train Dangerous.</title>
+<meta name="description" content="Free personalized lacrosse training for kids 10 and under. 9-question assessment. 7-day plan. Skill breakdown. Local events near you."/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --g:#1a6b3c;--gm:#2d8f55;--gl:#e8f5ee;--gb:#3dba72;
+  --cream:#faf8f3;--cdark:#f0ece0;
+  --ink:#0e1a14;--inkm:#2a3d30;--muted:#6b7d6f;
+  --white:#fff;--acc:#f5a623;--accd:#c47d0a;
+  --serif:'DM Serif Display',Georgia,serif;
+  --sans:'DM Sans',sans-serif;
+  --disp:'Bebas Neue',sans-serif;
+}
+html{scroll-behavior:smooth;}
+body{font-family:var(--sans);background:var(--cream);color:var(--ink);line-height:1.6;overflow-x:hidden;}
+a{text-decoration:none;}
+button{font-family:var(--sans);cursor:pointer;border:none;}
+input{font-family:var(--sans);font-size:14px;padding:11px 14px;border:1px solid rgba(0,0,0,0.15);border-radius:6px;width:100%;background:var(--white);color:var(--ink);outline:none;transition:border-color .2s;display:block;margin-bottom:8px;}
+input:focus{border-color:var(--g);}
+
+/* NAV */
+nav{position:fixed;top:0;left:0;right:0;z-index:300;height:64px;padding:0 5%;display:flex;align-items:center;justify-content:space-between;background:rgba(14,26,20,.97);backdrop-filter:blur(12px);}
+.logo{font-family:var(--disp);font-size:28px;color:var(--white);letter-spacing:.06em;}
+.logo span{color:var(--acc);}
+.nav-links{display:flex;align-items:center;gap:1.75rem;}
+.nav-links a{font-size:14px;color:rgba(255,255,255,.6);transition:color .2s;}
+.nav-links a:hover{color:var(--white);}
+.nav-cta{background:var(--acc)!important;color:var(--ink)!important;padding:8px 18px;border-radius:6px;font-weight:500;}
+.nav-cta:hover{background:#e09510!important;}
+
+/* HERO */
+.hero{min-height:100vh;padding:64px 5% 60px;background:var(--ink);display:grid;grid-template-columns:1fr 1fr;gap:4rem;align-items:center;position:relative;overflow:hidden;}
+.hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 75% 50%,rgba(61,186,114,.07) 0%,transparent 65%);pointer-events:none;}
+.hero-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(61,186,114,.1);border:1px solid rgba(61,186,114,.2);border-radius:20px;padding:6px 14px;font-size:13px;color:var(--gb);font-weight:500;margin-bottom:1.5rem;}
+.hero-badge::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--gb);animation:blink 2s ease-in-out infinite;}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:.3;}}
+h1.hero-h{font-family:var(--disp);font-size:clamp(60px,8vw,106px);line-height:.9;color:var(--white);letter-spacing:.03em;margin-bottom:1rem;}
+h1.hero-h .danger{color:var(--acc);}
+h1.hero-h .period{color:var(--gb);}
+.hero-tagline{font-size:clamp(14px,1.5vw,17px);color:var(--gb);font-weight:500;letter-spacing:.06em;text-transform:uppercase;margin-bottom:.75rem;}
+.hero-sub{font-size:15px;color:rgba(255,255,255,.5);line-height:1.7;max-width:440px;margin-bottom:2rem;font-weight:300;}
+.hero-sub strong{color:rgba(255,255,255,.8);font-weight:500;}
+.hero-btns{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:2rem;}
+.btn-acc{display:inline-flex;align-items:center;gap:10px;background:var(--acc);color:var(--ink);padding:15px 26px;border-radius:8px;font-size:15px;font-weight:500;transition:all .2s;}
+.btn-acc:hover{background:#e09510;transform:translateY(-1px);}
+.btn-acc svg{transition:transform .2s;}
+.btn-acc:hover svg{transform:translateX(3px);}
+.btn-ghost{display:inline-flex;align-items:center;gap:8px;background:transparent;color:rgba(255,255,255,.5);padding:15px 18px;border-radius:8px;font-size:14px;transition:color .2s;}
+.btn-ghost:hover{color:var(--white);}
+.hero-proof{display:flex;align-items:center;gap:1rem;padding-top:1.5rem;border-top:1px solid rgba(255,255,255,.07);}
+.proof-avs{display:flex;}
+.proof-avs span{width:30px;height:30px;border-radius:50%;background:var(--gm);border:2px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:500;color:var(--white);margin-left:-8px;}
+.proof-avs span:first-child{margin-left:0;}
+.proof-txt{font-size:13px;color:rgba(255,255,255,.4);}
+.proof-txt strong{color:rgba(255,255,255,.75);font-weight:500;}
+
+/* HERO STATS */
+.stat-cards{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.stat-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:1.25rem;}
+.stat-card.feat{background:var(--g);border-color:var(--gm);grid-column:1/-1;}
+.stat-num{font-family:var(--disp);font-size:46px;line-height:1;color:var(--white);letter-spacing:.02em;}
+.stat-num sup{font-family:var(--sans);font-size:20px;vertical-align:top;margin-top:8px;display:inline-block;color:var(--gb);}
+.stat-label{font-size:13px;color:rgba(255,255,255,.5);margin-top:4px;line-height:1.4;}
+.feat .stat-label{color:rgba(255,255,255,.7);}
+.tag-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;}
+.tag{font-size:11px;padding:3px 9px;border-radius:20px;background:rgba(255,255,255,.12);color:rgba(255,255,255,.8);}
+
+/* SECTIONS */
+.section{padding:80px 5%;}
+.sec-inner{max-width:1100px;margin:0 auto;}
+.sec-label{font-size:12px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--g);margin-bottom:.75rem;}
+h2.sec-h{font-family:var(--disp);font-size:clamp(36px,5vw,62px);line-height:1;letter-spacing:.02em;color:var(--ink);}
+h2.sec-h em{font-family:var(--serif);font-style:italic;color:var(--g);}
+.sec-sub{font-size:16px;color:var(--muted);line-height:1.65;max-width:540px;margin-top:.75rem;font-weight:300;}
+
+/* PROBLEM */
+.prob-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.5rem;margin-top:3rem;}
+.prob-card{background:var(--white);border:1px solid rgba(0,0,0,.07);border-radius:12px;padding:1.5rem;}
+.prob-icon{width:40px;height:40px;border-radius:8px;background:#fef3dd;display:flex;align-items:center;justify-content:center;margin-bottom:1rem;font-size:20px;}
+.prob-card h3{font-size:15px;font-weight:500;margin-bottom:.4rem;}
+.prob-card p{font-size:13px;color:var(--muted);line-height:1.6;}
+
+/* HOW IT WORKS */
+.how-bg{background:var(--ink);}
+.how-bg .sec-label{color:var(--gb);}
+.how-bg h2.sec-h{color:var(--white);}
+.how-bg .sec-sub{color:rgba(255,255,255,.45);}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:1.5rem;margin-top:3rem;position:relative;}
+.steps::before{content:'';position:absolute;top:27px;left:8%;right:8%;height:1px;background:rgba(255,255,255,.08);}
+.step{text-align:center;position:relative;}
+.step-num{width:54px;height:54px;border-radius:50%;background:var(--g);display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;font-family:var(--disp);font-size:24px;color:var(--white);position:relative;z-index:1;}
+.step h3{font-size:14px;font-weight:500;color:var(--white);margin-bottom:.4rem;}
+.step p{font-size:13px;color:rgba(255,255,255,.4);line-height:1.6;}
+
+/* FEATURES */
+.feat-grid{display:grid;grid-template-columns:1fr 1fr;gap:3rem;margin-top:3rem;align-items:center;}
+.feat-list{display:flex;flex-direction:column;gap:1.25rem;}
+.feat-item{display:flex;gap:1rem;align-items:flex-start;}
+.feat-ico{width:40px;height:40px;border-radius:8px;background:var(--gl);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px;}
+.feat-item h3{font-size:15px;font-weight:500;margin-bottom:2px;}
+.feat-item p{font-size:13px;color:var(--muted);line-height:1.6;}
+.mock-box{background:var(--white);border:1px solid rgba(0,0,0,.07);border-radius:16px;padding:1.5rem;overflow:hidden;}
+.mock-hdr{display:flex;align-items:center;gap:10px;margin-bottom:1.25rem;padding-bottom:1rem;border-bottom:1px solid rgba(0,0,0,.07);}
+.mock-av{width:36px;height:36px;border-radius:50%;background:var(--g);display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--white);font-weight:500;}
+.mock-name{font-size:14px;font-weight:500;}
+.mock-role{font-size:12px;color:var(--muted);}
+.mock-lvl{margin-left:auto;font-size:12px;padding:3px 10px;border-radius:20px;background:var(--gl);color:var(--g);font-weight:500;}
+.xp-wrap{background:var(--cdark);border-radius:4px;height:6px;margin:8px 0 4px;}
+.xp-fill{height:100%;width:67%;background:var(--gb);border-radius:4px;}
+.xp-lbl{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);}
+.drill-lbl{font-size:12px;color:var(--muted);margin:1rem 0 6px;}
+.drill-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;margin-bottom:6px;font-size:13px;}
+.d-done{background:var(--gl);color:var(--g);}
+.d-active{background:var(--cdark);color:var(--ink);font-weight:500;border:1px solid rgba(26,107,60,.2);}
+.d-locked{color:var(--muted);}
+.d-chk{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;}
+.c-done{background:var(--g);color:var(--white);}
+.c-act{background:var(--acc);color:var(--white);}
+.c-lock{background:var(--cdark);color:var(--muted);}
+.d-pts{margin-left:auto;font-size:11px;font-weight:500;color:var(--g);}
+.d-pts.dim{color:var(--muted);}
+.mock-video-note{margin-top:1rem;padding-top:1rem;border-top:1px solid rgba(0,0,0,.07);font-size:12px;color:var(--g);font-weight:500;}
+
+/* COACH */
+.coach-bg{background:var(--cdark);}
+.coach-inner{display:grid;grid-template-columns:1fr 1fr;gap:4rem;align-items:center;}
+.check-list{list-style:none;display:flex;flex-direction:column;gap:9px;margin-bottom:2rem;}
+.check-list li{font-size:14px;color:var(--inkm);display:flex;gap:9px;align-items:flex-start;}
+.check-list li::before{content:'✓';color:var(--g);font-weight:500;flex-shrink:0;margin-top:1px;}
+.roster-box{background:var(--white);border:1px solid rgba(0,0,0,.07);border-radius:16px;padding:1.5rem;}
+.roster-title{font-size:13px;font-weight:500;margin-bottom:1rem;color:var(--ink);}
+.roster-row{display:flex;align-items:center;gap:10px;padding:10px;border-radius:8px;margin-bottom:6px;}
+.roster-av{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--white);font-weight:500;flex-shrink:0;}
+.roster-name{font-size:13px;font-weight:500;}
+.roster-status{font-size:11px;color:var(--muted);}
+.roster-badge{margin-left:auto;font-size:11px;padding:2px 8px;border-radius:10px;white-space:nowrap;}
+
+/* TESTIMONIALS */
+.testi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.5rem;margin-top:3rem;}
+.testi-card{background:var(--white);border:1px solid rgba(0,0,0,.07);border-radius:12px;padding:1.5rem;}
+.testi-stars{color:var(--acc);font-size:14px;margin-bottom:.75rem;letter-spacing:2px;}
+.testi-card p{font-size:14px;color:var(--inkm);line-height:1.7;margin-bottom:1rem;}
+.testi-auth{display:flex;align-items:center;gap:10px;}
+.testi-av{width:32px;height:32px;border-radius:50%;background:var(--gm);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--white);font-weight:500;}
+.testi-name{font-size:13px;font-weight:500;}
+.testi-role{font-size:12px;color:var(--muted);}
+
+/* PRICING */
+.price-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.5rem;margin-top:3rem;}
+.price-card{background:var(--white);border:1px solid rgba(0,0,0,.08);border-radius:12px;padding:1.75rem;position:relative;}
+.price-card.feat-price{border:2px solid var(--g);}
+.price-pop{position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:var(--g);color:var(--white);font-size:12px;font-weight:500;padding:4px 14px;border-radius:20px;white-space:nowrap;}
+.price-tier{font-size:12px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:.75rem;}
+.price-amt{font-family:var(--disp);font-size:52px;line-height:1;color:var(--ink);letter-spacing:.02em;}
+.price-amt sup{font-family:var(--sans);font-size:20px;vertical-align:top;margin-top:10px;display:inline-block;}
+.price-amt sub{font-family:var(--sans);font-size:14px;color:var(--muted);}
+.price-desc{font-size:13px;color:var(--muted);margin:.5rem 0 1.25rem;line-height:1.5;}
+.price-feats{list-style:none;display:flex;flex-direction:column;gap:8px;margin-bottom:1.5rem;}
+.price-feats li{font-size:13px;color:var(--inkm);display:flex;align-items:flex-start;gap:8px;line-height:1.5;}
+.price-feats li::before{content:'✓';color:var(--g);font-weight:500;flex-shrink:0;margin-top:1px;}
+.price-feats li.off{color:var(--muted);}
+.price-feats li.off::before{content:'–';color:var(--muted);}
+.btn-price{display:block;text-align:center;padding:12px;border-radius:8px;font-size:14px;font-weight:500;transition:all .2s;font-family:var(--sans);cursor:pointer;border:none;}
+.btn-grn{background:var(--g);color:var(--white);}
+.btn-grn:hover{background:var(--gm);}
+.btn-out{background:transparent;color:var(--ink);border:1px solid rgba(0,0,0,.15)!important;}
+.btn-out:hover{border-color:var(--g)!important;color:var(--g);}
+
+/* QUIZ CTA BAND */
+.quiz-band{background:var(--ink);padding:80px 5%;text-align:center;}
+.quiz-band h2.sec-h{color:var(--white);}
+.quiz-band h2.sec-h em{color:var(--acc);}
+.quiz-band .sec-sub{color:rgba(255,255,255,.5);margin:1rem auto 2.5rem;}
+.quiz-note{margin-top:1rem;font-size:13px;color:rgba(255,255,255,.35);}
+
+/* FOOTER */
+footer{background:var(--ink);border-top:1px solid rgba(255,255,255,.05);color:rgba(255,255,255,.4);padding:36px 5%;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;}
+.foot-logo{font-family:var(--disp);font-size:22px;color:var(--white);}
+.foot-logo span{color:var(--acc);}
+.foot-links{display:flex;gap:1.5rem;}
+.foot-links a{font-size:13px;color:rgba(255,255,255,.35);transition:color .2s;}
+.foot-links a:hover{color:var(--white);}
+.foot-copy{font-size:12px;}
+
+/* ANIMATIONS */
+@keyframes fadeUp{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
+.fu{opacity:0;animation:fadeUp .6s ease forwards;}
+.fu1{animation-delay:.1s;}.fu2{animation-delay:.25s;}.fu3{animation-delay:.4s;}.fu4{animation-delay:.55s;}
+
+/* MODAL OVERLAY */
+.modal-overlay{display:none;position:fixed;inset:0;z-index:400;background:rgba(14,26,20,.85);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px;}
+.modal-overlay.open{display:flex;}
+.modal-box{background:var(--cream);border-radius:16px;width:100%;max-width:640px;max-height:90vh;overflow-y:auto;position:relative;}
+.modal-close{position:absolute;top:14px;right:16px;background:transparent;border:none;font-size:22px;color:var(--muted);cursor:pointer;z-index:10;line-height:1;padding:4px 8px;}
+.modal-close:hover{color:var(--ink);}
+
+/* QUIZ INSIDE MODAL */
+.quiz-wrap{padding:2rem;}
+.q-card{background:var(--white);border:1px solid rgba(0,0,0,.08);border-radius:12px;padding:1.5rem;margin-bottom:1rem;}
+.opt-btn{display:block;width:100%;text-align:left;padding:11px 15px;margin:7px 0;background:var(--white);border:1px solid rgba(0,0,0,.12);border-radius:8px;cursor:pointer;font-size:14px;color:var(--ink);transition:all .15s;font-family:var(--sans);}
+.opt-btn:hover{background:var(--gl);}
+.opt-btn.sel{background:var(--gl);border-color:var(--g);color:#085041;}
+.opt-btn.sel-m{background:#EEEDFE;border-color:#534AB7;color:#3C3489;}
+.prog-wrap{height:4px;background:var(--cdark);border-radius:2px;margin-bottom:1.5rem;}
+.prog-fill{height:100%;background:var(--g);border-radius:2px;transition:width .3s ease;}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin:0 2px;background:rgba(0,0,0,.12);}
+.dot.act{background:var(--g);}
+.dot.dn{background:var(--gb);}
+.step-lbl{font-size:13px;color:var(--muted);margin-left:6px;}
+.pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;margin:2px 3px 2px 0;}
+.pill-g{background:var(--gl);color:#085041;}
+.pill-p{background:#EEEDFE;color:#3C3489;}
+.pill-a{background:#FAEEDA;color:#633806;}
+.load-bar{height:3px;background:var(--gl);border-radius:2px;overflow:hidden;margin:1rem 0;}
+.load-fill{height:100%;width:0;background:var(--g);border-radius:2px;transition:width .5s ease;}
+.res-box{background:var(--cdark);border-radius:10px;padding:1rem 1.25rem;margin:.75rem 0;}
+.res-row{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid rgba(0,0,0,.07);}
+.res-row:last-child{border-bottom:none;}
+.day-card{border:1px solid rgba(0,0,0,.08);border-radius:10px;padding:12px 14px;margin-bottom:8px;}
+.cta-box{background:var(--gl);border-radius:10px;padding:1rem 1.25rem;margin-top:1.25rem;}
+.nav-note-box{border-left:3px solid var(--g);border-radius:0;padding-left:1rem;background:var(--cdark);border-radius:0 8px 8px 0;}
+
+/* RESPONSIVE */
+@media(max-width:900px){
+  .hero{grid-template-columns:1fr;min-height:auto;padding-top:84px;}
+  .stat-cards{grid-template-columns:1fr 1fr;}
+  .prob-grid,.steps,.testi-grid,.price-grid,.feat-grid,.coach-inner{grid-template-columns:1fr;}
+  .how-bg .steps::before{display:none;}
+  .nav-links{display:none;}
+}
+@media(max-width:600px){
+  h1.hero-h{font-size:58px;}
+  .stat-cards{grid-template-columns:1fr;}
+  .quiz-wrap{padding:1.25rem;}
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="logo">MDM<span>.</span>Lax</div>
+  <div class="nav-links">
+    <a href="#how">How it works</a>
+    <a href="#features">Features</a>
+    <a href="#pricing">Pricing</a>
+    <a href="#quiz-anchor" class="nav-cta" onclick="openQuiz();return false;">Free assessment</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div style="position:relative;z-index:1;">
+    <div class="hero-badge fu fu1">Free 10U player assessment</div>
+    <h1 class="hero-h fu fu2">TRAIN<br><span class="danger">DANGER</span><span class="period">OUS.</span></h1>
+    <p class="hero-tagline fu fu2">Become the Most Dangerous Player on the Field.</p>
+    <p class="hero-sub fu fu3">Most 10U players are given generic drills or nothing at all. <strong>MDM Lax</strong> gives your child a personalized training plan built around their exact skill gaps — with local games and resources to grow alongside them.</p>
+    <div class="hero-btns fu fu4">
+      <button class="btn-acc" onclick="openQuiz()">
+        Take the free assessment
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <a href="#how" class="btn-ghost">See how it works →</a>
+    </div>
+    <div class="hero-proof fu fu4">
+      <div class="proof-avs"><span>JM</span><span>SR</span><span>TK</span><span>+</span></div>
+      <div class="proof-txt"><strong>Built by a lacrosse coach</strong> with 10+ years developing 10U players</div>
+    </div>
+  </div>
+  <div style="position:relative;z-index:1;" class="fu fu3">
+    <div class="stat-cards">
+      <div class="stat-card feat">
+        <div class="stat-num">7<sup>-day</sup></div>
+        <div class="stat-label">Personalized training plan — free, generated in seconds from your child's actual skill profile</div>
+        <div class="tag-row"><span class="tag">All fundamentals</span><span class="tag">Parent-friendly</span></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num">40<sup>+</sup></div>
+        <div class="stat-label">Drills designed for ages 10 and under</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num">D1</div>
+        <div class="stat-label">Local college games + clinics near you</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PROBLEM -->
+<section class="section" style="background:var(--white);">
+  <div class="sec-inner">
+    <div class="sec-label">The problem</div>
+    <h2 class="sec-h">Most kids quit before<br>they <em>ever get good.</em></h2>
+    <p class="sec-sub">Not because they lack talent — because nobody gave them the right plan at the right time.</p>
+    <div class="prob-grid">
+      <div class="prob-card">
+        <div class="prob-icon">📋</div>
+        <h3>Generic drills go nowhere</h3>
+        <p>YouTube has tons of lacrosse content — but none of it knows your child can't catch yet. A 9-year-old doing advanced drills just feels frustrated and quits.</p>
+      </div>
+      <div class="prob-card">
+        <div class="prob-icon">🤷</div>
+        <h3>Parents don't know what to teach</h3>
+        <p>Most lacrosse parents didn't grow up playing. Showing up in the backyard with a stick and no plan leads to 10 minutes of chaos and everyone going inside.</p>
+      </div>
+      <div class="prob-card">
+        <div class="prob-icon">📉</div>
+        <h3>Progress is invisible</h3>
+        <p>Kids who can't see themselves improving stop caring. Without a way to measure growth, the sport feels the same every practice and motivation disappears.</p>
+      </div>
+    </div>
+    <div style="text-align:center;padding:2.5rem 0 1rem;">
+      <div style="font-family:var(--disp);font-size:16px;letter-spacing:.1em;color:var(--muted);">THERE IS A BETTER WAY</div>
+      <div style="width:1px;height:40px;background:var(--cdark);margin:1rem auto;"></div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="section how-bg" id="how">
+  <div class="sec-inner">
+    <div class="sec-label">How it works</div>
+    <h2 class="sec-h" style="color:var(--white);">From zero to a real plan<br>in under <em style="color:var(--acc);">3 minutes.</em></h2>
+    <p class="sec-sub">No account needed to start. Take the assessment, get your plan, then track progress in the full app.</p>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <h3>Take the assessment</h3>
+        <p>9 questions about your child's skills, struggles, goals, and available time. Takes 3 minutes.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <h3>Get your plan</h3>
+        <p>AI generates a personalized 7-day plan with skill breakdown and parent coaching tips.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <h3>Find local events</h3>
+        <p>We surface D1 games, youth clinics, and online resources matched to your zip code.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <h3>Track and level up</h3>
+        <p>Log drills, upload videos, earn XP. Coaches can assign plans and review player progress.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="section" id="features">
+  <div class="sec-inner">
+    <div class="sec-label">The platform</div>
+    <h2 class="sec-h">Built for 10U players,<br><em>designed for parents.</em></h2>
+    <p class="sec-sub">Every feature answers one question: what does a parent with no lacrosse experience need to help their kid actually improve?</p>
+    <div class="feat-grid">
+      <div class="feat-list">
+        <div class="feat-item">
+          <div class="feat-ico">🎯</div>
+          <div><h3>Skill-gap training plans</h3><p>Plans target the specific skills your child struggles with — not a generic beginner program. Catching problems get catching drills.</p></div>
+        </div>
+        <div class="feat-item">
+          <div class="feat-ico">🏆</div>
+          <div><h3>Points and XP progression</h3><p>Players earn XP for completing drills, uploading videos, and hitting fitness benchmarks. Levels keep kids motivated week after week.</p></div>
+        </div>
+        <div class="feat-item">
+          <div class="feat-ico">📹</div>
+          <div><h3>Video submission + AI feedback</h3><p>Upload a drill video from your phone. AI reviews it first, then a coach confirms. Points awarded after approval.</p></div>
+        </div>
+        <div class="feat-item">
+          <div class="feat-ico">📍</div>
+          <div><h3>Local games and clinics</h3><p>We find D1 college games, youth clinics, and USA Lacrosse events near you. Watching live lacrosse changes how kids see the sport.</p></div>
+        </div>
+        <div class="feat-item">
+          <div class="feat-ico">👨‍👩‍👧</div>
+          <div><h3>Parent-managed accounts</h3><p>Designed for kids without devices. Parents log drills, upload videos, and track progress entirely from their own phone.</p></div>
+        </div>
+      </div>
+      <div class="mock-box">
+        <div class="mock-hdr">
+          <div class="mock-av">JM</div>
+          <div><div class="mock-name">Jamie M.</div><div class="mock-role">Age 9 · Building Fundamentals</div></div>
+          <div class="mock-lvl">Level 4</div>
+        </div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:4px;">Weekly XP progress</div>
+        <div class="xp-wrap"><div class="xp-fill"></div></div>
+        <div class="xp-lbl"><span>340 XP earned</span><span>500 XP to Level 5</span></div>
+        <div class="drill-lbl">Today's drills</div>
+        <div class="drill-item d-done"><div class="d-chk c-done">✓</div>Wall ball warm-up — 5 min<span class="d-pts">+25 XP</span></div>
+        <div class="drill-item d-done"><div class="d-chk c-done">✓</div>Ground ball scoop drill<span class="d-pts">+40 XP</span></div>
+        <div class="drill-item d-active"><div class="d-chk c-act">▶</div>Catch and cradle — 10 reps<span class="d-pts">+35 XP</span></div>
+        <div class="drill-item d-locked"><div class="d-chk c-lock">○</div>Triangle pass with parent<span class="d-pts dim">+50 XP</span></div>
+        <div class="mock-video-note">Upload video of drill #3 for bonus XP →</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- COACH -->
+<section class="section coach-bg">
+  <div class="sec-inner">
+    <div class="coach-inner">
+      <div>
+        <div class="sec-label">For coaches</div>
+        <h2 class="sec-h">Your team.<br><em>Your program.</em></h2>
+        <p style="font-size:15px;color:var(--muted);line-height:1.7;margin:1rem 0 1.5rem;font-weight:300;">Assign drills to individual players or your whole roster. See who is putting in work between practices. Review video submissions with AI-drafted feedback ready to confirm or edit.</p>
+        <ul class="check-list">
+          <li>Invite players via team code or email</li>
+          <li>Assign any drill to any player or group</li>
+          <li>AI reviews video first — you confirm or edit</li>
+          <li>Full roster progress dashboard</li>
+          <li>Parents get visibility into their child's plan</li>
+        </ul>
+        <a href="#pricing" class="btn-acc" style="display:inline-flex;font-size:14px;padding:12px 22px;">See team pricing →</a>
+      </div>
+      <div class="roster-box">
+        <div class="roster-title">Team roster — Spring 2025</div>
+        <div class="roster-row" style="background:var(--gl);">
+          <div class="roster-av" style="background:var(--g);">JM</div>
+          <div><div class="roster-name">Jamie M.</div><div class="roster-status">3 of 4 drills done today</div></div>
+          <span class="roster-badge" style="background:var(--g);color:var(--white);">Active</span>
+        </div>
+        <div class="roster-row" style="background:var(--cream);">
+          <div class="roster-av" style="background:var(--acc);">SR</div>
+          <div><div class="roster-name">Sam R.</div><div class="roster-status">Video submitted — awaiting review</div></div>
+          <span class="roster-badge" style="background:#fef3dd;color:var(--accd);">Review</span>
+        </div>
+        <div class="roster-row" style="background:var(--cream);">
+          <div class="roster-av" style="background:var(--muted);">TK</div>
+          <div><div class="roster-name">Tyler K.</div><div class="roster-status">No activity this week</div></div>
+          <span class="roster-badge" style="background:var(--cdark);color:var(--muted);">Nudge</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TESTIMONIALS -->
+<section class="section" style="background:var(--white);">
+  <div class="sec-inner">
+    <div class="sec-label">Early feedback</div>
+    <h2 class="sec-h">What lacrosse families<br><em>are saying.</em></h2>
+    <div class="testi-grid">
+      <div class="testi-card">
+        <div class="testi-stars">★★★★★</div>
+        <p>"I played zero sports growing up. Having a plan that told me exactly what to do in the backyard — and why — completely changed how we practice together."</p>
+        <div class="testi-auth"><div class="testi-av">KL</div><div><div class="testi-name">Kristin L.</div><div class="testi-role">Parent, son age 8</div></div></div>
+      </div>
+      <div class="testi-card">
+        <div class="testi-stars">★★★★★</div>
+        <p>"The skill breakdown was spot-on. She had been struggling with ground balls for two months and the plan focused exactly on that. Three weeks later she is a different player."</p>
+        <div class="testi-auth"><div class="testi-av">DM</div><div><div class="testi-name">David M.</div><div class="testi-role">Parent, daughter age 10</div></div></div>
+      </div>
+      <div class="testi-card">
+        <div class="testi-stars">★★★★★</div>
+        <p>"I use it with my whole 10U team. It saves me hours of planning and parents love being involved. The video review feature is a game changer for individual feedback at scale."</p>
+        <div class="testi-auth"><div class="testi-av">RC</div><div><div class="testi-name">Rob C.</div><div class="testi-role">10U head coach, 18 players</div></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- QUIZ CTA BAND -->
+<section class="quiz-band" id="quiz-anchor">
+  <div class="sec-label" style="color:rgba(255,255,255,.4);">Start here — it is free</div>
+  <h2 class="sec-h" style="margin-top:.5rem;">Find out exactly where<br>your player <em>stands.</em></h2>
+  <p class="sec-sub" style="margin:1rem auto 2rem;max-width:500px;">Answer 9 questions. Get a real personalized training plan, skill breakdown, local events, and online resources — in under 3 minutes.</p>
+  <button class="btn-acc" style="font-size:16px;" onclick="openQuiz()">
+    Take the free assessment
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+  <p class="quiz-note">No credit card. No account required to get your plan.</p>
+</section>
+
+<!-- PRICING -->
+<section class="section" id="pricing">
+  <div class="sec-inner">
+    <div class="sec-label">Pricing</div>
+    <h2 class="sec-h">Start free.<br><em>Upgrade when ready.</em></h2>
+    <p class="sec-sub">The assessment and first plan are always free. Upgrade to track progress, submit videos, and unlock the full drill library.</p>
+    <div class="price-grid">
+      <div class="price-card">
+        <div class="price-tier">Free</div>
+        <div class="price-amt"><sup>$</sup>0</div>
+        <div class="price-desc">Get started — no commitment</div>
+        <ul class="price-feats">
+          <li>Full 9-question assessment</li>
+          <li>AI-generated 7-day plan</li>
+          <li>Skill breakdown report</li>
+          <li>Local events + online resources</li>
+          <li class="off">Progress tracking</li>
+          <li class="off">Video submission</li>
+          <li class="off">Coach assignment</li>
+        </ul>
+        <button class="btn-price btn-out" onclick="openQuiz()">Get free plan</button>
+      </div>
+      <div class="price-card feat-price">
+        <div class="price-pop">Most popular</div>
+        <div class="price-tier">Player Pro</div>
+        <div class="price-amt"><sup>$</sup>9<sub>/mo</sub></div>
+        <div class="price-desc">For families training consistently</div>
+        <ul class="price-feats">
+          <li>Everything in Free</li>
+          <li>Full drill library — 40+ drills</li>
+          <li>Progress tracking + XP system</li>
+          <li>Video submission (AI-reviewed)</li>
+          <li>New weekly plan each week</li>
+          <li>Local event updates</li>
+          <li class="off">Coach assignment tools</li>
+        </ul>
+        <button class="btn-price btn-grn" onclick="openQuiz()">Start free trial</button>
+      </div>
+      <div class="price-card">
+        <div class="price-tier">Team / Coach</div>
+        <div class="price-amt"><sup>$</sup>49<sub>/mo</sub></div>
+        <div class="price-desc">For coaches and club programs</div>
+        <ul class="price-feats">
+          <li>Everything in Player Pro</li>
+          <li>Up to 25 players per roster</li>
+          <li>Assign drills to players or groups</li>
+          <li>Coach video review dashboard</li>
+          <li>Roster progress overview</li>
+          <li>Parent visibility per player</li>
+        </ul>
+        <button class="btn-price btn-out">Contact for team setup</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="foot-logo">MDM<span>.</span>Lax</div>
+  <div class="foot-links"><a href="#">Privacy</a><a href="#">Terms</a><a href="#">Contact</a></div>
+  <div class="foot-copy">© 2025 MDM Lax. Train Dangerous.</div>
+</footer>
+
+<!-- QUIZ MODAL -->
+<div class="modal-overlay" id="quiz-modal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeQuiz()">✕</button>
+    <div class="quiz-wrap" id="quiz-inner">
+      <!-- Rendered by JS -->
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── MODAL ────────────────────────────────────────────────────────────────
+function openQuiz(){
+  document.getElementById('quiz-modal').classList.add('open');
+  document.body.style.overflow='hidden';
+  if(!quizStarted) renderIntro();
+}
+function closeQuiz(){
+  document.getElementById('quiz-modal').classList.remove('open');
+  document.body.style.overflow='';
+}
+document.getElementById('quiz-modal').addEventListener('click',function(e){
+  if(e.target===this) closeQuiz();
+});
+
+// ─── QUIZ DATA ────────────────────────────────────────────────────────────
+const Qs=[
+  {key:'experience',type:'single',
+   q:'How long has your child been playing lacrosse?',
+   sub:'We use this to set the right starting point — no experience is totally fine.',
+   opts:['Never picked up a stick','Less than 3 months','3–6 months','6 months to 1 year','1–2 years']},
+  {key:'struggles',type:'multi',
+   q:'Which of these does your child struggle with most?',
+   sub:'Select all that apply — this is the most important question.',
+   opts:['Just holding and controlling the stick','Catching the ball (it bounces off the pocket)','Throwing with any accuracy','Scooping ground balls cleanly','Cradling while moving','Understanding where to be on the field','Staying focused during practice']},
+  {key:'strengths',type:'multi',
+   q:'What does your child do well or enjoy most?',
+   sub:'Select anything that fits — we build on strengths.',
+   opts:['They are athletic and coordinated generally','They love competing and trying hard','They are good at catching and throwing in other sports','They move well with good footwork','They are coachable and love learning','Pure enthusiasm — they just love being out there']},
+  {key:'position',type:'single',
+   q:'Does your child play a specific position or is it wide open?',
+   sub:'At 10U we focus on all-around fundamentals, but this helps personalize the plan.',
+   opts:['No position yet — learning everything','They tend to play attack (near the goal)','They tend to play midfield (run a lot)','They tend to play defense','They want to play goalie']},
+  {key:'days',type:'single',
+   q:'How many days per week can your child realistically practice?',
+   sub:'Even 15–20 focused minutes beats an hour of distracted practice.',
+   opts:['1 day a week','2 days a week','3 days a week','4–5 days a week','Every day — they love it']},
+  {key:'equipment',type:'single',
+   q:'What equipment do you currently have?',
+   sub:"We'll only include drills that use what you've got.",
+   opts:['Stick only (no ball yet)','Stick and ball','Full starter set — stick, ball, helmet, gloves','Full gear plus a wall or rebounder']},
+  {key:'setting',type:'single',
+   q:'Where does your child usually practice?',
+   sub:'This helps us design drills that fit your actual space.',
+   opts:['Small backyard or driveway','Park or open grass field','Driveway with a wall to throw against','Team practice only — no solo practice yet','Mix of different spots']},
+  {key:'goal',type:'single',
+   q:"What's your biggest goal for your child this season?",
+   sub:'There is no wrong answer — this shapes the whole plan.',
+   opts:['Just have fun and fall in love with the game','Learn enough basics to not feel lost at practice','Get noticeably better and build real confidence','Stand out on the team and get more playing time','Prepare for a select or travel team tryout']},
+  {key:'parent_exp',type:'single',
+   q:'How familiar are you with lacrosse as a parent?',
+   sub:"We'll include coaching tips matched to your knowledge level.",
+   opts:['Completely new to the sport — learning alongside my kid','I watch games but do not really know the details','I know the basics and can help a little','I played lacrosse or coached before']}
+];
+
+let answers={}, cur=0, quizStarted=false;
+
+// ─── SCREENS ──────────────────────────────────────────────────────────────
+function renderIntro(){
+  quizStarted=true;
+  document.getElementById('quiz-inner').innerHTML=`
+    <p style="font-size:13px;color:var(--muted);margin:0 0 4px;">Free 10U player assessment</p>
+    <h2 style="font-family:var(--disp);font-size:32px;letter-spacing:.03em;color:var(--ink);margin:0 0 .75rem;line-height:1.1;">IS YOUR CHILD GETTING THE RIGHT TRAINING?</h2>
+    <p style="font-size:15px;color:var(--muted);margin:0 0 1.25rem;line-height:1.6;">Answer 9 questions and get a free personalized 7-day plan — plus local events and resources matched to your child's level.</p>
+    <div style="margin-bottom:1.5rem;">
+      <span class="pill pill-g">Ages 10 and under</span>
+      <span class="pill pill-g">~3 minutes</span>
+      <span class="pill pill-p">Free personalized plan</span>
+      <span class="pill pill-a">Local + online resources</span>
+    </div>
+    <button class="btn-acc" style="width:100%;justify-content:center;" onclick="startQuiz()">Start the assessment →</button>`;
+}
+
+function startQuiz(){
+  cur=0; answers={};
+  renderQ();
+}
+
+function renderDots(){
+  const d=Qs.map((_,i)=>`<span class="dot ${i<cur?'dn':i===cur?'act':''}"></span>`).join('');
+  return `<div style="display:flex;align-items:center;margin-bottom:1.25rem;">
+    ${d}<span class="step-lbl">Question ${cur+1} of ${Qs.length}</span>
+  </div>`;
+}
+
+function renderQ(){
+  const pct=Math.round((cur/Qs.length)*100);
+  const q=Qs[cur];
+  const saved=answers[q.key]||[];
+  const isM=q.type==='multi';
+  document.getElementById('quiz-inner').innerHTML=`
+    <div class="prog-wrap"><div class="prog-fill" style="width:${pct}%"></div></div>
+    ${renderDots()}
+    <div class="q-card">
+      <p style="font-size:13px;color:var(--muted);margin:0 0 4px;">${q.sub}</p>
+      <p style="font-size:17px;font-weight:500;margin:0 0 ${isM?'6px':'1rem'};line-height:1.4;">${q.q}</p>
+      ${isM?'<p style="font-size:12px;color:var(--muted);margin:0 0 .75rem;">Select all that apply</p>':''}
+      ${q.opts.map(o=>{
+        const isSel=isM?saved.includes(o):saved===o;
+        const cls=isSel?(isM?'opt-btn sel-m':'opt-btn sel'):'opt-btn';
+        return `<button class="${cls}" onclick="pick(this,'${q.key}',\`${o}\`,${isM})">${o}</button>`;
+      }).join('')}
+    </div>
+    <div style="display:flex;gap:8px;margin-top:.5rem;">
+      ${cur>0?`<button class="opt-btn" style="width:auto;padding:10px 18px;" onclick="goBack()">Back</button>`:''}
+      <button class="btn-acc" style="flex:1;justify-content:center;padding:12px;" onclick="goNext()">${cur===Qs.length-1?'See my plan →':'Next'}</button>
+    </div>`;
+}
+
+function pick(el,key,val,multi){
+  if(multi){
+    if(!answers[key])answers[key]=[];
+    if(answers[key].includes(val)){answers[key]=answers[key].filter(v=>v!==val);el.classList.remove('sel-m');}
+    else{answers[key].push(val);el.classList.add('sel-m');}
+  } else {
+    answers[key]=val;
+    document.querySelectorAll('#quiz-inner .opt-btn').forEach(b=>b.classList.remove('sel'));
+    el.classList.add('sel');
+  }
+}
+
+function goNext(){
+  const a=answers[Qs[cur].key];
+  if(!a||(Array.isArray(a)&&a.length===0)){alert('Please make a selection to continue.');return;}
+  if(cur<Qs.length-1){cur++;renderQ();}
+  else renderEmail();
+}
+
+function goBack(){if(cur>0){cur--;renderQ();}}
+
+function renderEmail(){
+  document.getElementById('quiz-inner').innerHTML=`
+    <div class="q-card">
+      <p style="font-size:13px;color:var(--muted);margin:0 0 4px;">One last step</p>
+      <p style="font-size:18px;font-weight:500;margin:0 0 .5rem;">Where should we send the plan?</p>
+      <p style="font-size:14px;color:var(--muted);margin:0 0 1.25rem;line-height:1.6;">You will get a full personalized 7-day training plan, skill breakdown, and local + online resources matched to your child's level.</p>
+      <input type="text" id="pname" placeholder="Your first name (parent)"/>
+      <input type="text" id="kname" placeholder="Your child's first name"/>
+      <input type="email" id="email" placeholder="Your email address"/>
+      <input type="text" id="zip" placeholder="Zip code (for local events near you)" style="margin-bottom:1rem;"/>
+      <button class="btn-acc" style="width:100%;justify-content:center;" onclick="generate()">Get my free plan →</button>
+      <p style="font-size:12px;color:var(--muted);margin:8px 0 0;text-align:center;">No spam. Unsubscribe anytime.</p>
+    </div>`;
+}
+
+function generate(){
+  const pn=document.getElementById('pname').value.trim();
+  const kn=document.getElementById('kname').value.trim();
+  const em=document.getElementById('email').value.trim();
+  const zp=document.getElementById('zip').value.trim();
+  if(!pn||!kn||!em){alert('Please fill in your name, your child\'s name, and your email.');return;}
+
+  document.getElementById('quiz-inner').innerHTML=`
+    <div style="padding:2rem;text-align:center;">
+      <p style="font-weight:500;font-size:16px;margin:0 0 4px;" id="lmsg">Analyzing your player's skill profile...</p>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 1.5rem;" id="lsub">Building a profile for ${kn}</p>
+      <div class="load-bar"><div class="load-fill" id="lfill"></div></div>
+    </div>`;
+
+  const steps=[
+    ['Analyzing skill gaps and strengths...','Building a profile for '+kn],
+    ['Selecting the right 10U fundamentals drills...','Matched to their specific struggles'],
+    ['Designing a weekly schedule...','Fits your space, gear, and available days'],
+    ['Finding local lacrosse events near you...','D1 games, clinics, and youth events'],
+    ['Curating online resources...','YouTube, livestreams, and learning tools'],
+    ['Writing your coaching tips...','Matched to your experience level'],
+  ];
+  let si=0;
+  const fill=document.getElementById('lfill');
+  const iv=setInterval(()=>{
+    if(si<steps.length&&document.getElementById('lmsg')){
+      document.getElementById('lmsg').textContent=steps[si][0];
+      document.getElementById('lsub').textContent=steps[si][1];
+      fill.style.width=Math.round(((si+1)/steps.length)*88)+'%';
+      si++;
+    }
+  },2000);
+
+  const struggles=(answers.struggles||[]).join(', ');
+  const strengths=(answers.strengths||[]).join(', ');
+
+  const prompt=`You are an expert 10U youth lacrosse coach and player development specialist. Generate a thorough, warm, highly personalized assessment.
+
+Player: ${kn} (age 10 or under)
+Parent: ${pn}
+Experience: ${answers.experience}
+Struggles (most important): ${struggles}
+Strengths: ${strengths}
+Position: ${answers.position}
+Practice days: ${answers.days}
+Equipment: ${answers.equipment}
+Practice setting: ${answers.setting}
+Season goal: ${answers.goal}
+Parent lacrosse experience: ${answers.parent_exp}
+Zip code: ${zp||'not provided'}
+
+Respond ONLY with valid JSON. No markdown, no backticks, no explanation outside the JSON. Use this exact structure:
+{
+  "headline": "One warm encouraging sentence to the parent about their child using the child's name",
+  "skill_level_label": "One of: First Steps / Building the Basics / Developing Fundamentals / Gaining Confidence",
+  "skill_level_summary": "2 sentences: honest and specific about where this player is right now",
+  "top_focus": "The single highest-priority skill to work on (1 short phrase)",
+  "why_this_focus": "1 sentence explaining why this skill unlocks everything else at this stage",
+  "skill_breakdown": [
+    {"skill":"Catching","status":"needs work","note":"1 specific observation"},
+    {"skill":"Throwing","status":"developing","note":"1 specific observation"},
+    {"skill":"Ground balls","status":"needs work","note":"1 specific observation"},
+    {"skill":"Cradling","status":"developing","note":"1 specific observation"},
+    {"skill":"Field sense","status":"needs work","note":"1 specific observation"}
+  ],
+  "week_plan": [
+    {"day":"Day 1","title":"Drill name","duration":"15 min","objective":"Skill this builds","drill":"Step-by-step instructions a parent with zero lacrosse experience can follow. Specific reps, distances, what to watch for.","parent_tip":"One coaching cue for the parent"},
+    {"day":"Day 2","title":"...","duration":"...","objective":"...","drill":"...","parent_tip":"..."},
+    {"day":"Day 3","title":"...","duration":"...","objective":"...","drill":"...","parent_tip":"..."},
+    {"day":"Day 4","title":"Watch and Learn","duration":"20 min","objective":"Game IQ and love for the sport","drill":"What to find on YouTube together and exactly what to look for while watching","parent_tip":"A conversation starter to have with your child"},
+    {"day":"Day 5","title":"...","duration":"...","objective":"...","drill":"...","parent_tip":"..."},
+    {"day":"Day 6","title":"...","duration":"...","objective":"...","drill":"...","parent_tip":"..."},
+    {"day":"Day 7","title":"Week 1 challenge","duration":"20 min","objective":"Celebrate progress","drill":"A fun challenge combining the week's skills that the child will enjoy and feel successful doing","parent_tip":"How to celebrate their effort regardless of outcome"}
+  ],
+  "local_events": [
+    {"type":"Live game","title":"Event type","description":"Specific guidance for finding this near ${zp||'their area'} — what to search, when these happen, why attending in person matters"},
+    {"type":"Clinic or camp","title":"Event type","description":"How to find 10U clinics or camps including USA Lacrosse resources"},
+    {"type":"Local league","title":"Event type","description":"How to find a local rec or club league for 10U and what to expect"}
+  ],
+  "online_resources": [
+    {"type":"YouTube","title":"What to search for","description":"Specific search terms and why this content helps at ${kn}'s level"},
+    {"type":"Livestream","title":"Where to watch college lacrosse live","description":"How to find free D1 lacrosse livestreams and why watching college lacrosse helps young players"},
+    {"type":"Parent guide","title":"Resource title","description":"A specific resource to help ${pn} coach at home with confidence"},
+    {"type":"USA Lacrosse","title":"USA Lacrosse resource","description":"A specific USA Lacrosse program or tool for 10U development"}
+  ],
+  "parent_note": "2-3 warm sentences directly to the parent about their role at this age — what matters most, how to be the best supporter, and one thing to avoid that parents commonly do that backfires with 10U players",
+  "next_step": "One specific actionable sentence about what to do after this week"
+}`;
+
+  const controller = new AbortController();
+  const fetchTimeout = setTimeout(() => controller.abort(), 60000);
+  fetch('/.netlify/functions/generate-plan?t='+Date.now(),{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({answers:answers, playerName:kn, parentName:pn, parentEmail:em, zip:zp}),
     signal: controller.signal
   })
   .then(r=>r.json())
