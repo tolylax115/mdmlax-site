@@ -31,21 +31,20 @@ Respond ONLY with this JSON and nothing else — no markdown, no backticks:
     const text = data.content && data.content[0] ? data.content[0].text : '';
     const clean = text.replace(/```json|```/g, '').trim();
 
-    // Send lead to Kit (fire and forget — don't block the response)
+    // Send lead to Kit using V3 API (more reliable with API keys)
     if (parentEmail && process.env.KIT_API_KEY && process.env.KIT_FORM_ID) {
-      fetch(`https://api.kit.com/v4/forms/${process.env.KIT_FORM_ID}/subscribers`, {
+      fetch(`https://api.convertkit.com/v3/forms/${process.env.KIT_FORM_ID}/subscribe`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Kit-Api-Key": process.env.KIT_API_KEY,
         },
         body: JSON.stringify({
-          email_address: parentEmail,
+          api_key: process.env.KIT_API_KEY,
+          email: parentEmail,
           first_name: parentName,
           fields: {
             player_name: playerName,
             zip_code: zip || '',
-            skill_level: answers.experience || '',
           }
         }),
       }).catch(err => console.log("Kit error:", err.message));
